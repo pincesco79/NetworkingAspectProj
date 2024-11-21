@@ -52,6 +52,7 @@
 // LoRa_E220 e220ttl(&Serial2, 18, 21, 19); //  RX AUX M0 M1
 
 LoRa_E220 e220ttl(17, 16, &Serial2, 15, 21, 19, UART_BPS_RATE_9600); //  esp32 RX <-- e220 TX, esp32 TX --> e220 RX AUX M0 M1
+
 // -------------------------------------
 
 // ---------- Raspberry PI Pico pins --------------
