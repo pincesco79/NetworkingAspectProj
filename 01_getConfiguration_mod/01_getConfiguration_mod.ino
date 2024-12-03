@@ -27,8 +27,8 @@
 //LoRa_E220 e220ttl(D2, D3); // Config without connect AUX and M0 M1
 
 //#include <SoftwareSerial.h>
-//SoftwareSerial mySerial(D2, D3); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX
-//LoRa_E220 e220ttl(&mySerial, D5, D7, D6); // AUX M0 M1
+//SoftwareSerial mySerial(2, 4); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX
+//LoRa_E220 e220ttl(&mySerial, 18, 21, 19); // AUX M0 M1
 // -------------------------------------
 
 // ---------- Arduino pins --------------
@@ -80,7 +80,7 @@ void setup() {
 
 	ResponseStructContainer c;
 	c = e220ttl.getConfiguration();
-	// It's important get configuration pointer before all other operation
+	// // It's important get configuration pointer before all other operation
 	Configuration configuration = *(Configuration*) c.data;
 	Serial.println(c.status.getResponseDescription());
 	Serial.println(c.status.code);
@@ -89,7 +89,7 @@ void setup() {
 
 	ResponseStructContainer cMi;
 	cMi = e220ttl.getModuleInformation();
-	// It's important get information pointer before all other operation
+	 // It's important get information pointer before all other operation
 	ModuleInformation mi = *(ModuleInformation*)cMi.data;
 
 	Serial.println(cMi.status.getResponseDescription());
@@ -130,6 +130,7 @@ void printParameters(struct Configuration configuration) {
 
 	Serial.println("----------------------------------------");
 }
+
 void printModuleInformation(struct ModuleInformation moduleInformation) {
 	Serial.println("----------------------------------------");
 	Serial.print(F("HEAD: "));  Serial.print(moduleInformation.COMMAND, HEX);Serial.print(" ");Serial.print(moduleInformation.STARTING_ADDRESS, HEX);Serial.print(" ");Serial.println(moduleInformation.LENGHT, DEC);
