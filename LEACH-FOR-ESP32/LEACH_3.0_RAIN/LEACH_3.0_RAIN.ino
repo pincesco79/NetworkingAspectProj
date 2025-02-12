@@ -28,12 +28,7 @@ int getBatteryChargeLevel(float voltage) {
 }
 
 // ------------------- STATES AND CONFIG -----------------------
-enum NodeState {
-  SEARCHING_CH,
-  CLUSTER_HEAD,
-  MEMBER,
-  WAITING_COOLDOWN
-};
+
 
 const int dry = 2400;
 const int wet = 900;
@@ -43,14 +38,26 @@ int rainValue;
 const uint8_t NODE_ID = 3; 
 const uint8_t TOTAL_NODES = 3;
 
-
 LoRa_E220 e220ttl(17, 16, &Serial2, AUX_PIN, 21, 19, UART_BPS_RATE_9600);
 //LoRa_E220(byte txE220pin, byte rxE220pin, HardwareSerial* serial, byte auxPin, UART_BPS_RATE bpsRate, uint32_t serialConfig = SERIAL_8N1);
 volatile bool interruptExecuted = false;
 
 const int ledPin = 23;
 
-struct receivedData {
+enum NodeState {
+  SEARCHING_CH,
+  CLUSTER_HEAD,
+  MEMBER,
+  WAITING_COOLDOWN
+};
+
+enum ClusterState {
+  SETUP,
+  STEADYSTATE
+};
+
+struct ReceivedData {
+  ClusterState cs ;
   int humidity;
   float temperature;
   float soilMoisture;
@@ -58,7 +65,15 @@ struct receivedData {
   float batteryLevel;
 };
 
-receivedData currentData = {0, 0, 0, false, 0};
+struct SetupData {
+  ClusterState cs ;
+  int cluster_head;
+  float RSSI;
+};
+
+ReceivedData currentData = {SETUP, 0, 0, 0, false, 0};
+ClusterState currentClusterState = SETUP;
+
 NodeState currentState = SEARCHING_CH;
     
 unsigned long lastClusterHeadTime = 0; 
@@ -81,37 +96,55 @@ void loraSetup() {
 }
 
 void loraWakeUp() {
-  interruptExecuted = true;
+   if (e220ttl.available()>1) { //occurs when a signal is detected
+    bool chFound = false; 
+    Serial.println("Message arrived: ");
+      // read the String Structured Message
+    ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(SetupData));
+    SetupData receivedSetupData = *(SetupData*) rsc.data;
+    //Serial.println(rc.status.getResponseDescription());
+    Serial.print(receivedSetupData.cs);
+
+    if (receivedSetupData.cs == SETUP) {
+      e220ttl.setMode(MODE_0_NORMAL); // change to normal mode
+      delay(1000);
+      // INFORM ABOUT THE CH FOUND
+      Serial.println("We have the CH");
+      //e220ttl.sendBroadcastFixedMessage(23, "We have the CH");
+      // CSMA/CA implementation. Nodes randomly send join confirmation to the CH from which this node received the message.
+      e220ttl.setMode(MODE_2_WOR_RECEIVER); // change back to WOR receiver mode
+      interruptExecuted = false;
+      chFound = true;
+    }
+     if (receivedSetupData.cs == STEADYSTATE) {
+      e220ttl.setMode(MODE_0_NORMAL); // change to normal mode
+      delay(1000);
+      // INFORM 
+      Serial.println("Wait for the next ROUND!");
+      e220ttl.setMode(MODE_2_WOR_RECEIVER); // change back to WOR receiver mode
+      interruptExecuted = false;
+      chFound = false;
+    }  
+  }
+  //if(interruptExecuted) {
+    //Serial.println("WakeUp Callback, AUX pin go LOW and start receive message!");
+    //Serial.flush();
+    //attachInterrupt(digitalPinToInterrupt(AUX_PIN), wakeUp, FALLING);
+    //interruptExecuted = false;
+  //}
   //detachInterrupt(digitalPinToInterrupt(AUX_PIN));
 }
 
 void leachSetupPhase() {
-  leachCHAdvPhase();
+  leachCHSelPhase();
   leachClusterSetupPhase();
   leachBroadCastSchedule();
 }
 
-void leachCHAdvPhase() {
-  if (e220ttl.available()>1) {
-    Serial.println("Message arrived: ");
-      // read the String message
-    ResponseContainer rc = e220ttl.receiveMessage();
-    String message = rc.data;
-    //Serial.println(rc.status.getResponseDescription());
-    Serial.print(message);
-    e220ttl.setMode(MODE_0_NORMAL); // change to normal mode
-    delay(1000);
-    e220ttl.sendBroadcastFixedMessage(23, "We have received the message!");
-    e220ttl.setMode(MODE_2_WOR_RECEIVER); // change back to WOR receiver mode
-    interruptExecuted = false;
-  }
+void leachCHSelPhase() {
+// CSMA/CA implementation. Nodes randomly decide to become CH. A Random time in which a node transmit its 
+// will is defined while the other nodes are in sleep mode
 
-  if(interruptExecuted) {
-    //Serial.println("WakeUp Callback, AUX pin go LOW and start receive message!");
-    Serial.flush();
-    //attachInterrupt(digitalPinToInterrupt(AUX_PIN), wakeUp, FALLING);
-    interruptExecuted = false;
-  }
 }
 
 void leachClusterSetupPhase(){
@@ -120,6 +153,12 @@ void leachClusterSetupPhase(){
 
 void leachBroadCastSchedule(){
 
+// will is defined while the other nodes are in sleep mode
+}
+
+void sendStructMessageWithCSMA_CA(){
+  ClusterState currentClusterState;
+  
 }
 
 void setup() {
@@ -139,7 +178,7 @@ void setup() {
 
 
 void loop() {
-  currentState = SEARCHING_CH;  
+  //currentState = SEARCHING_CH;  
   leachSetupPhase();
   //e220ttl.sendMessage(&receivedData,sizeof(receivedData));
   //e220ttl.sendBroadcastFixedMessage(23, &currentData, sizeof(currentData));
